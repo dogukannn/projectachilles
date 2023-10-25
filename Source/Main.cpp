@@ -1,6 +1,7 @@
 #include <iostream>
 
 //#define DEBUG_CAMERA_LOCATION //uncomment to log camera data
+
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -13,6 +14,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "Camera.h"
 #include "ConstantBuffer.h"
 #include "DynamicRootSignature.h"
 #include "pch.h"
@@ -20,6 +22,7 @@
 #include "Pipeline.h"
 #include "Shader.h"
 #include "Texture.h"
+#include "Tilemap.h"
 
 // Global variables for the window and DirectX
 SDL_Window* GWindow = nullptr;
@@ -323,8 +326,11 @@ int main(int argc, char* argv[])
 
 	device->CreateDepthStencilView(depthStencilBuffer, &depthStencilDesc, dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-    Mesh mesh;
-    mesh.loadFromObj(device, "../Assets/graveyard.obj");
+    //Mesh mesh;
+    //mesh.loadFromObj(device, "../Assets/graveyard.obj");
+
+    Tilemap tilemap;
+    tilemap.Initialize(device);
 
     Mesh cubeMesh;
     cubeMesh.loadFromObj(device, "../Assets/cube.obj");
@@ -349,7 +355,8 @@ int main(int argc, char* argv[])
     glm::vec3 eye(25.2203f, 44.637f, -12.9169f);
     glm::vec3 eye_dir(-0.409304f, -0.27564f, 0.896766f);
     glm::vec3 up(0.f, 1.f, 0.f);
-    auto viewMatrix = glm::lookAt(eye, eye + eye_dir, up);
+    Camera cam = { eye, eye_dir, up };
+    auto viewMatrix = cam.GetViewMatrix();
     auto modelMatrix = glm::mat4(1.f);
     cbVS.MVP = projectionMatrix * viewMatrix * modelMatrix;
 
@@ -413,14 +420,22 @@ int main(int argc, char* argv[])
     SDL_Event event;
     bool quit = false;
 
-    float speed = 0.1f;
+    float speed = 0.01f;
     static const glm::vec3 forward(0.f,0.f,1.f);
     static const glm::vec3 right(-1.f,0.f,0.f);
     bool captureDir = false;
-    eye = glm::vec3(8.0f, 0.0f, 0.0f);
-    eye_dir = glm::vec3(-1.0f, 0.0f, 0.0f);
+    eye = glm::vec3(7.5f, 20.0f, 0.0f);
+    eye_dir = normalize(glm::vec3(0.0f, -0.9f, 0.4f));
+
+
     while (!quit)
     {
+		std::chrono::time_point<std::chrono::system_clock> currentTime;
+		currentTime = std::chrono::system_clock::now();
+        auto delta = currentTime - startTime;
+        float deltaTime = std::chrono::duration_cast<std::chrono::microseconds>(delta).count() / 1000.f;
+        startTime = currentTime;
+        bool d = false;
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
@@ -431,19 +446,20 @@ int main(int argc, char* argv[])
             {
 	            switch (event.key.keysym.sym)
 	            {
-					case SDLK_w:
-						eye += eye_dir * speed;
-						break;
-	            case SDLK_d:
-						eye += glm::cross(eye_dir, up) * speed;
-						break;
-	            	case SDLK_s:
+					//case SDLK_w:
+					//	eye += normalize(eye_dir) * speed * deltaTime;
+					//	break;
+					//case SDLK_d:
+     //                   d = true;
+					//	//eye += normalize(glm::cross(eye_dir, up)) * speed * deltaTime;
+					//	break;
+	    //        	case SDLK_s:
 
-						eye -= eye_dir * speed;
-						break;
-					case SDLK_a:
-						eye -= glm::cross(eye_dir, up) * speed;
-						break;
+					//	eye -= normalize(eye_dir) * speed * deltaTime;
+					//	break;
+					//case SDLK_a:
+					//	eye -= normalize(glm::cross(eye_dir, up)) * speed * deltaTime;
+					//	break;
 					case SDLK_r:
 						eye = glm::vec3(0.f, 0.f, -3.f);
 						eye_dir =  glm::vec3(0.f,0.f,1.f);
@@ -455,20 +471,35 @@ int main(int argc, char* argv[])
             }
             if(event.type == SDL_MOUSEBUTTONDOWN)
             {
+                if (!captureDir)
+                    SDL_GetRelativeMouseState(nullptr, nullptr);
                 captureDir = true;
             }
 		}
+        const Uint8* a = SDL_GetKeyboardState(NULL);
+
+        if(a[SDL_SCANCODE_D])
+			eye += normalize(glm::cross(eye_dir, up)) * speed * deltaTime;
+        if(a[SDL_SCANCODE_W])
+			eye += normalize(eye_dir) * speed * deltaTime;
+        if(a[SDL_SCANCODE_S])
+			eye -= normalize(eye_dir) * speed * deltaTime;
+        if(a[SDL_SCANCODE_A])
+			eye -= normalize(glm::cross(eye_dir, up)) * speed * deltaTime;
+
+
         if(captureDir)
         {
-			int x, y;
-            static float yaw = 0.0f, pitch = 0.0f;
+			int x = 0, y = 0;
+        	static float pitch = glm::degrees(asin(eye_dir.y));
+            static float yaw = asin(eye_dir.x / cos(pitch));
 			SDL_GetRelativeMouseState(&x, &y);
-            yaw += x * 0.2f;
-            pitch += y * 0.2f;
+            yaw -= x * 0.2f;
+            pitch -= y * 0.2f;
             glm::vec3 direction;
-			direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+			direction.z = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
 			direction.y = sin(glm::radians(pitch));
-			direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+			direction.x = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
             eye_dir = direction;
         }
 
@@ -485,7 +516,7 @@ int main(int argc, char* argv[])
 		CubeMvp.time = diff.count();
 
 #ifdef DEBUG_CAMERA_LOCATION
-		std::cerr << "\r" << static_cast<int>((static_cast<double>(imageHeight - j) / imageHeight) * 100.0) << "% of file write is completed         " << std::flush;
+		//std::cerr << "\r" << static_cast<int>((static_cast<double>(imageHeight - j) / imageHeight) * 100.0) << "% of file write is completed         " << std::flush;
         std::cout << "eye " << eye.x << " " << eye.y << " " << eye.z << std::endl;
         std::cout << "eye dir " << eye_dir.x << " " << eye_dir.y << " " << eye_dir.z << std::endl;
         std::cout << "up " << up.x << " " << up.y << " " << up.z << std::endl;
@@ -519,53 +550,53 @@ int main(int argc, char* argv[])
 		commandList->ClearRenderTargetView(rtvHandle2, clearColor, 0, nullptr);
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		pipeline.BindConstantBuffer("cb", &sceneBuffer, commandList);
-		commandList->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);
+		commandList->IASetVertexBuffers(0, 1, &tilemap.plane.vertexBufferView);
 		//commandList->IASetIndexBuffer(&indexBufferView);
-        commandList->DrawInstanced(mesh._vertices.size(), 1, 0, 0);
+        commandList->DrawInstanced(tilemap.plane._vertices.size(), 1, 0, 0);
 
 
-		D3D12_CPU_DESCRIPTOR_HANDLE
-			rtvHandle3(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
-		rtvHandle3.ptr = rtvHandle3.ptr + (frameIndex * rtvDescriptorSize);
+		//D3D12_CPU_DESCRIPTOR_HANDLE
+		//	rtvHandle3(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
+		//rtvHandle3.ptr = rtvHandle3.ptr + (frameIndex * rtvDescriptorSize);
 
-		const float clearColorx[] = {0.0f, 0.0f, 0.0f, 0.0f};
-		commandList->ClearRenderTargetView(rtvHandle3, clearColorx, 0, nullptr);
-        
-        CopyTexturePlain(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET, backDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_DEPTH_WRITE, depthStencilBuffer);
-		
-        commandList->OMSetRenderTargets(1, &rtvHandle3, FALSE, &dsvHandle);
+		//const float clearColorx[] = {0.0f, 0.0f, 0.0f, 0.0f};
+		//commandList->ClearRenderTargetView(rtvHandle3, clearColorx, 0, nullptr);
+  //      
+  //      CopyTexturePlain(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET, backDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_DEPTH_WRITE, depthStencilBuffer);
+		//
+  //      commandList->OMSetRenderTargets(1, &rtvHandle3, FALSE, &dsvHandle);
 
-        depthBackPipeline.SetPipelineState(commandAllocator, commandList);
-    	depthBackPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
-		commandList->IASetVertexBuffers(0, 1, &cubeMesh.vertexBufferView);
-        commandList->DrawInstanced(cubeMesh._vertices.size(), 1, 0, 0);
+  //      depthBackPipeline.SetPipelineState(commandAllocator, commandList);
+  //  	depthBackPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
+		//commandList->IASetVertexBuffers(0, 1, &cubeMesh.vertexBufferView);
+  //      commandList->DrawInstanced(cubeMesh._vertices.size(), 1, 0, 0);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE
-			rtvHandle4(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
-		rtvHandle4.ptr = rtvHandle4.ptr + ((frameIndex + backbufferCount) * rtvDescriptorSize);
+		//D3D12_CPU_DESCRIPTOR_HANDLE
+		//	rtvHandle4(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
+		//rtvHandle4.ptr = rtvHandle4.ptr + ((frameIndex + backbufferCount) * rtvDescriptorSize);
 
-		commandList->ClearRenderTargetView(rtvHandle4, clearColorx, 0, nullptr);
-        
-        commandList->OMSetRenderTargets(1, &rtvHandle4, FALSE, &dsvHandle);
-        depthFrontPipeline.SetPipelineState(commandAllocator, commandList);
-    	depthFrontPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
-		commandList->IASetVertexBuffers(0, 1, &cubeMesh.vertexBufferView);
-        commandList->DrawInstanced(cubeMesh._vertices.size(), 1, 0, 0);
+		//commandList->ClearRenderTargetView(rtvHandle4, clearColorx, 0, nullptr);
+  //      
+  //      commandList->OMSetRenderTargets(1, &rtvHandle4, FALSE, &dsvHandle);
+  //      depthFrontPipeline.SetPipelineState(commandAllocator, commandList);
+  //  	depthFrontPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
+		//commandList->IASetVertexBuffers(0, 1, &cubeMesh.vertexBufferView);
+  //      commandList->DrawInstanced(cubeMesh._vertices.size(), 1, 0, 0);
 
 
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(backDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE));
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(frontDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE));
-        
-        commandList->OMSetRenderTargets(1, &rtvHandle2, FALSE, &dsvHandle);
-        commandList->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-                                           D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		//commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(backDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE));
+		//commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(frontDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE));
+  //      
+  //      commandList->OMSetRenderTargets(1, &rtvHandle2, FALSE, &dsvHandle);
+  //      commandList->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+  //                                         D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-        volumetricPipeline.SetPipelineState(commandAllocator, commandList);
-    	volumetricPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
-    	volumetricPipeline.BindTexture(device, "frontCulled", backDepthRenderTargets[frameIndex]);
-    	volumetricPipeline.BindTexture(device, "backCulled", frontDepthRenderTargets[frameIndex]);
-		commandList->IASetVertexBuffers(0, 1, &triangle.vertexBufferView);
-        commandList->DrawInstanced(triangle._vertices.size(), 1, 0, 0);
+  //      volumetricPipeline.SetPipelineState(commandAllocator, commandList);
+  //  	volumetricPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
+  //  	volumetricPipeline.BindTexture(device, "frontCulled", backDepthRenderTargets[frameIndex]);
+  //  	volumetricPipeline.BindTexture(device, "backCulled", frontDepthRenderTargets[frameIndex]);
+		//commandList->IASetVertexBuffers(0, 1, &triangle.vertexBufferView);
+  //      commandList->DrawInstanced(triangle._vertices.size(), 1, 0, 0);
 
         commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
@@ -574,7 +605,7 @@ int main(int argc, char* argv[])
 		ID3D12CommandList* ppCommandLists[] = {commandList};
 		commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-		 swapchain->Present(1, 0);
+		 swapchain->Present(0, 0);
 
 		// Signal and increment the fence value.
 		ThrowIfFailed(commandQueue->Signal(fence, fenceValue++));
