@@ -1,13 +1,14 @@
 #pragma once
 
-#include "Mesh.h"
+#include "Object.h"
 #include "pch.h"
 
-struct Tilemap 
+struct Tilemap : public Object
 {
-	int size = 3;
+	int size = 49;
 	float gridLen = 5.0f;
-	Mesh plane;
 
-	bool Initialize(ID3D12Device* device);
+	virtual void Update(float deltaTime) override;
+
+	bool Initialize(int size, float gridLen);
 };

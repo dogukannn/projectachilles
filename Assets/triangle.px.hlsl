@@ -18,7 +18,8 @@ PixelOutput main(PixelInput pixelInput)
 {
     PixelOutput output;
     output.attachment0 = g_texture.Sample(s1, pixelInput.uv) * 0.00001;
-    output.attachment0 += float4(pixelInput.color, 1.0);
+    float3 col = (0.5 + max(0, dot(pixelInput.normal, float3(0., 0.77, 0.77)))) * pixelInput.color;
+    output.attachment0 += float4(col, 1.0);
     //output.attachment0 = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
     //output.attachment0 = float4(pixelInput.normal + float3(0.5f), 1.0f);

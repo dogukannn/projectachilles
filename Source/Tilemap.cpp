@@ -1,7 +1,14 @@
 #include "Tilemap.h"
 
-bool Tilemap::Initialize(ID3D12Device* device)
+void Tilemap::Update(float deltaTime)
 {
+
+}
+
+bool Tilemap::Initialize(int size, float gridLen)
+{
+	Object::Initialize();
+
 	std::vector<Vertex> vertices;
 
 	for (int x = 0; x < size; x++)
@@ -28,6 +35,6 @@ bool Tilemap::Initialize(ID3D12Device* device)
 		}
 	}
 
-	plane.loadFromVertices(device, vertices);
+	mesh.loadFromVertices(GDevice, vertices);
 	return true;
 }

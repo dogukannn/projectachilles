@@ -1,9 +1,13 @@
-cbuffer cb : register(b0)
+cbuffer scene : register(b0)
 {
-    row_major float4x4 mvp : packoffset(c0);
-    row_major float4x4 inverseVP : packoffset(c4);
+    row_major float4x4 vp : packoffset(c0);
     float3 eye : packoffset(c8.x);
     float time : packoffset(c8.w);
+}
+
+cbuffer object : register(b1)
+{
+    row_major float4x4 model : packoffset(c0);
 };
 
 Texture2D g_texture : register(t1);
@@ -29,7 +33,7 @@ VertexOutput main(VertexInput vertexInput)
 {
     float3 inColor = vertexInput.inColor;
     float3 inPos = vertexInput.inPos;
-    float4 position = mul(float4(inPos, 1.0f), mvp);
+    float4 position = mul(float4(inPos, 1.0f), mul(model, vp));
 
     VertexOutput output;
     output.position = position;
