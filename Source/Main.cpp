@@ -10,6 +10,9 @@
 
 #define GLM_DEPTH_ZERO_TO_ONE
 #include <chrono>
+#include <imgui.h>
+#include <imgui_impl_dx12.h>
+#include <imgui_impl_sdl2.h>
 #include <glm/matrix.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -79,6 +82,22 @@ bool InitializeWindow(int width, int height)
 
     SDL_SetWindowGrab(GWindow, SDL_TRUE);
 
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsLight();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplSDL2_InitForD3D(GWindow);
+
+    
     //SDL_SetWindowGrab(GWindow, SDL_TRUE);
 	return true;
 }
@@ -110,6 +129,26 @@ void CopyTexturePlain(ID3D12GraphicsCommandList* commandList, D3D12_RESOURCE_STA
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(srcTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, srcState));
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(dstTexture, D3D12_RESOURCE_STATE_COPY_DEST, dstState));
+}
+
+glm::vec3 rayCast(double xpos, double ypos, glm::mat4 projection, glm::mat4 view) {
+    // converts a position from the 2d xpos, ypos to a normalized 3d direction
+    float x = (2.0f * xpos) / 800.f - 1.0f;
+    float y = 1.0f - (2.0f * ypos) / 800.f;
+    float z = 1.0f;
+    glm::vec3 ray_nds = glm::vec3(x, y, z);
+    glm::vec4 ray_clip = glm::vec4(ray_nds.x, ray_nds.y, -1.0f, 1.0f);
+    // eye space to clip we would multiply by projection so
+    // clip space to eye space is the inverse projection
+    glm::vec4 ray_eye = inverse(projection) * ray_clip;
+    // convert point to forwards
+    ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
+    // world space to eye space is usually multiply by view so
+    // eye space to world space is inverse view
+    glm::vec4 inv_ray_wor = (inverse(view) * ray_eye);
+    glm::vec3 ray_wor = glm::vec3(inv_ray_wor.x, inv_ray_wor.y, inv_ray_wor.z);
+    ray_wor = normalize(ray_wor);
+    return ray_wor;
 }
 
 inline std::vector<char> readFile(const std::string& filename)
@@ -172,6 +211,21 @@ int main(int argc, char* argv[])
     ID3D12Device* device = nullptr;
     ThrowIfFailed(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&device)));
     GDevice = device;
+
+	ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
+
+	D3D12_DESCRIPTOR_HEAP_DESC Imguidesc = {};
+	Imguidesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	Imguidesc.NumDescriptors = 1;
+	Imguidesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ThrowIfFailed(GDevice->CreateDescriptorHeap(&Imguidesc, IID_PPV_ARGS(&g_pd3dSrvDescHeap)));
+    
+
+	ImGui_ImplDX12_Init(GDevice, 2,
+			DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
+			g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
+			g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+
 
     DXGI_ADAPTER_DESC1 desc;
     adapter->GetDesc1(&desc);
@@ -358,13 +412,22 @@ int main(int argc, char* argv[])
 
     Tilemap tilemap;
     tilemap.Initialize(9, 5.0f);
+    tilemap.name = "tilemap";
 
     Unit unit;
     unit.Initialize();
+    unit.name = "unit";
+
+
+    Unit unit2;
+    unit2.Initialize();
+    unit2.location = glm::vec3(10, 1, 10);
+    unit2.name = "unit2";
 
     Scene scene;
     scene.Objects.push_back(&tilemap);
     scene.Objects.push_back(&unit);
+    scene.Objects.push_back(&unit2);
 
 
     Mesh cubeMesh;
@@ -427,9 +490,23 @@ int main(int argc, char* argv[])
     static const glm::vec3 forward(0.f,0.f,1.f);
     static const glm::vec3 right(-1.f,0.f,0.f);
     bool captureDir = false;
+    bool drag = false;
+    ImVec2 dragStart(0,0);
+    ImVec2 dragEnd(0,0);
+    bool dragFinished = false;
 
     while (!quit)
     {
+        ImGui_ImplDX12_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
+		//ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+        //bool open = true;
+		//ImGui::ShowDemoWindow(&open);
+
+
 		std::chrono::time_point<std::chrono::system_clock> currentTime;
 		currentTime = std::chrono::system_clock::now();
         auto delta = currentTime - startTime;
@@ -438,6 +515,8 @@ int main(int argc, char* argv[])
         bool d = false;
         while (SDL_PollEvent(&event))
         {
+            ImGui_ImplSDL2_ProcessEvent(&event);
+
             if (event.type == SDL_QUIT)
             {
                 quit = true;
@@ -457,11 +536,51 @@ int main(int argc, char* argv[])
             }
             if(event.type == SDL_MOUSEBUTTONDOWN)
             {
-                if (!captureDir)
-                    SDL_GetRelativeMouseState(nullptr, nullptr);
-                captureDir = true;
+                if(event.button.button == SDL_BUTTON_RIGHT)
+                {
+					int x, y;
+					SDL_GetMouseState(&x, &y);
+                    auto dir = rayCast(x, y, cam.GetPerspectiveMatrix(), cam.GetViewMatrix());
+					auto f = (1.0f - cam.Eye.y) / dir.y;
+                    auto target = (cam.Eye + dir * f);
+                    scene.SetTargetOfSelectedUnits(target);
+                }
+                else
+                {
+					std::cout << "doiwnnn" << std::endl;
+					if (!captureDir)
+						SDL_GetRelativeMouseState(nullptr, nullptr);
+					captureDir = true;
+					int x, y;
+					SDL_GetMouseState(&x, &y);
+					dragStart = ImVec2(x, y);
+					drag = true;
+                }
+            }
+           
+
+            if(event.type == SDL_MOUSEBUTTONUP)
+            {
+                if(event.button.button == SDL_BUTTON_RIGHT)
+                {
+	                
+                }
+                else
+                {
+					drag = false;
+					dragFinished = true;
+                }
+
             }
 		}
+
+        if(drag)
+        {
+			int x, y;
+			SDL_GetMouseState(&x, &y);
+			dragEnd = ImVec2(x, y);
+        }
+
         const Uint8* a = SDL_GetKeyboardState(NULL);
 
         if(a[SDL_SCANCODE_D])
@@ -489,7 +608,7 @@ int main(int argc, char* argv[])
 
 		   int xw, yw;
             SDL_GetMouseState(&xw, &yw);
-            std::cout << xw <<  ", " << yw << std::endl;
+            //std::cout << xw <<  ", " << yw << std::endl;
             if(xw < 10)
             {
                 auto right = normalize(glm::cross(cam.EyeDir, cam.Up)) * speed * deltaTime;
@@ -510,6 +629,16 @@ int main(int argc, char* argv[])
                 auto forward = normalize(cam.EyeDir) * speed * deltaTime;
                 cam.Eye -= glm::vec3(forward.x, 0, forward.z);
             }
+        }
+        if(drag)
+        {
+			auto dlist = ImGui::GetForegroundDrawList();
+            int xmin = std::min(dragStart.x, dragEnd.x);
+            int xmax = std::max(dragStart.x, dragEnd.x);
+            int ymin = std::min(dragStart.y, dragEnd.y);
+            int ymax = std::max(dragStart.y, dragEnd.y);
+			dlist->AddRectFilled(ImVec2(xmin,ymin), ImVec2(xmax,ymax), IM_COL32(50, 168, 141, 180));
+			dlist->AddRect(ImVec2(xmin,ymin), ImVec2(xmax,ymax), IM_COL32(30, 120, 90, 180), 0, 0, 3);
         }
 
         sceneCB.VP = cam.GetVPMatrix();
@@ -555,8 +684,18 @@ int main(int argc, char* argv[])
 
 		pipeline.BindConstantBuffer("scene", &sceneBuffer, commandList);
 
+        if(dragFinished)
+        {
+            scene.SelectUnits({dragStart.x / 799.f, dragStart.y / 799.f}, {dragEnd.x / 799.f, dragEnd.y / 799.f}, cam);
+            dragFinished = false;
+        }
+
         scene.Update(deltaTime);
         scene.Draw(commandList, pipeline);
+
+        ImGui::Render();
+		commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 
 		//D3D12_CPU_DESCRIPTOR_HANDLE
 		//	rtvHandle3(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());

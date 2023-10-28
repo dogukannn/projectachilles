@@ -25,8 +25,17 @@ struct Vertex
 	};
 };
 
+
+struct BoundingBox
+{
+	glm::vec3 minp;
+	glm::vec3 maxp;
+};
+
 struct Mesh
 {
+	BoundingBox bb;
+
 	std::vector<Vertex> _vertices;
 
     ID3D12Resource* vertexBuffer;

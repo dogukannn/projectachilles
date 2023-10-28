@@ -26,6 +26,8 @@ bool Mesh::loadFromObj(ID3D12Device* device, const char* filename)
         std::cerr << err << std::endl;
         return false;
     }
+    glm::vec3 maxp(FLT_MIN, FLT_MIN, FLT_MIN);
+    glm::vec3 minp(FLT_MAX, FLT_MAX, FLT_MAX);
 
     for(size_t s = 0; s < shapes.size(); s++)
     {
@@ -41,6 +43,19 @@ bool Mesh::loadFromObj(ID3D12Device* device, const char* filename)
                 tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
 
+                if (vx < minp.x)
+                    minp.x = vx;
+                if (vy < minp.y)
+                    minp.y = vy;
+                if (vz < minp.z)
+                    minp.z = vz;
+
+                if (vx > maxp.x)
+                    maxp.x = vx;
+                if (vy > maxp.y)
+                    maxp.y = vy;
+                if (vz > maxp.z)
+                    maxp.z = vz;
                 
                 tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
                 tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
@@ -66,6 +81,7 @@ bool Mesh::loadFromObj(ID3D12Device* device, const char* filename)
             index_offset += fv;
         }
     }
+    bb= { minp, maxp };
 
     const UINT vertexBufferSize = _vertices.size() * sizeof(Vertex);
 
@@ -110,6 +126,30 @@ bool Mesh::loadFromObj(ID3D12Device* device, const char* filename)
 
 bool Mesh::loadFromVertices(ID3D12Device* device, std::vector<Vertex>& vertices)
 {
+    
+    glm::vec3 maxp(FLT_MIN, FLT_MIN, FLT_MIN);
+    glm::vec3 minp(FLT_MAX, FLT_MAX, FLT_MAX);
+	for(auto v : vertices)
+	{
+        float vx = v.position.x;
+        float vy = v.position.y;
+        float vz = v.position.z;
+		if (vx < minp.x)
+			minp.x = vx;
+		if (vy < minp.y)
+			minp.y = vy;
+		if (vz < minp.z)
+			minp.z = vz;
+
+		if (vx > maxp.x)
+			maxp.x = vx;
+		if (vy > maxp.y)
+			maxp.y = vy;
+		if (vz > maxp.z)
+			maxp.z = vz;
+	}
+    bb = { minp, maxp };
+
     _vertices = vertices;
     const UINT vertexBufferSize = _vertices.size() * sizeof(Vertex);
 

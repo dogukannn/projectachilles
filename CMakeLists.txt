@@ -7,6 +7,7 @@ set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/External)
 # Dependencies
 # ------------
 
+
 # SDL2 (Minimal setup)
 set(SDL_ATOMIC OFF CACHE BOOL "" FORCE)
 set(SDL_CPUINFO OFF CACHE BOOL "" FORCE)
@@ -35,6 +36,24 @@ add_subdirectory(${EXTERNAL_DIR}/tinyobjloader)
 
 add_subdirectory(${EXTERNAL_DIR}/glm)
 
+# imgui
+set(IMGUI_DIR ${EXTERNAL_DIR}/imgui)
+set(IMGUI_SOURCES 
+${IMGUI_DIR}/imgui.cpp
+${IMGUI_DIR}/imgui_draw.cpp
+${IMGUI_DIR}/imgui_tables.cpp
+${IMGUI_DIR}/imgui_widgets.cpp
+${IMGUI_DIR}/imgui_demo.cpp
+${IMGUI_DIR}/backends/imgui_impl_dx12.cpp
+${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+)
+set(IMGUI_INCLUDE_DIR ${IMGUI_DIR} ${IMGUI_DIR}/backends) 
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_link_libraries(imgui PUBLIC SDL2-static)
+target_include_directories(imgui PUBLIC ${IMGUI_INCLUDE_DIR})
+
+
+
 set(CMAKE_CXX_STANDARD 17)
 
 file(GLOB_RECURSE SOURCES
@@ -51,4 +70,4 @@ add_custom_target(Shaders SOURCES ${SHADER_FILES})
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Source/pch.h)
-target_link_libraries(${PROJECT_NAME} PRIVATE SDL2-static DirectX-Headers DirectXTK12 d3d12 dxcompiler dxgi dxguid glm::glm tinyobjloader)
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL2-static DirectX-Headers DirectXTK12 d3d12 dxcompiler dxgi dxguid glm::glm tinyobjloader imgui)

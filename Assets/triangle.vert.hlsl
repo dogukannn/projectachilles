@@ -1,8 +1,8 @@
 cbuffer scene : register(b0)
 {
     row_major float4x4 vp : packoffset(c0);
-    float3 eye : packoffset(c8.x);
-    float time : packoffset(c8.w);
+    float3 eye : packoffset(c4.x);
+    float time : packoffset(c4.w);
 }
 
 cbuffer object : register(b1)

@@ -144,7 +144,7 @@ void Pipeline::SetPipelineState(ID3D12CommandAllocator* commandAllocator, ID3D12
 	commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE descriptorHandle(DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	commandList->SetGraphicsRootDescriptorTable(2, descriptorHandle);
+	commandList->SetGraphicsRootDescriptorTable(3, descriptorHandle);
 }
 
 void Pipeline::BindTexture(ID3D12Device* device, std::string name, class Texture* texture)

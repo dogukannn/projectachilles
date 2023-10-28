@@ -11,6 +11,13 @@ struct Camera
 	glm::vec3 EyeDir;
 	glm::vec3 Up;
 
+	float fov;
+	float aspect;
+	float nearz;
+	float farz;
+
+	Camera();
+
 	glm::mat4 GetViewMatrix();
 	glm::mat4 GetPerspectiveMatrix();
 	glm::mat4 GetVPMatrix();
