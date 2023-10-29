@@ -18,6 +18,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Camera.h"
+
+#include "ClientThread.h"
+#include "ServerThread.h"
+
 #include "ConstantBuffer.h"
 #include "DynamicRootSignature.h"
 #include "pch.h"
@@ -28,6 +32,7 @@
 #include "Texture.h"
 #include "Tilemap.h"
 #include "Unit.h"
+
 
 // Global variables for the window and DirectX
 SDL_Window* GWindow = nullptr;
@@ -131,24 +136,46 @@ void CopyTexturePlain(ID3D12GraphicsCommandList* commandList, D3D12_RESOURCE_STA
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(dstTexture, D3D12_RESOURCE_STATE_COPY_DEST, dstState));
 }
 
-glm::vec3 rayCast(double xpos, double ypos, glm::mat4 projection, glm::mat4 view) {
+glm::vec3 rayCast(double xpos, double ypos, glm::mat4 projection, glm::mat4 view, Camera& cam) {
     // converts a position from the 2d xpos, ypos to a normalized 3d direction
     float x = (2.0f * xpos) / 800.f - 1.0f;
     float y = 1.0f - (2.0f * ypos) / 800.f;
-    float z = 1.0f;
-    glm::vec3 ray_nds = glm::vec3(x, y, z);
-    glm::vec4 ray_clip = glm::vec4(ray_nds.x, ray_nds.y, -1.0f, 1.0f);
-    // eye space to clip we would multiply by projection so
-    // clip space to eye space is the inverse projection
-    glm::vec4 ray_eye = inverse(projection) * ray_clip;
-    // convert point to forwards
-    ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
-    // world space to eye space is usually multiply by view so
-    // eye space to world space is inverse view
-    glm::vec4 inv_ray_wor = (inverse(view) * ray_eye);
-    glm::vec3 ray_wor = glm::vec3(inv_ray_wor.x, inv_ray_wor.y, inv_ray_wor.z);
-    ray_wor = normalize(ray_wor);
-    return ray_wor;
+    
+    //borrowed from net
+    //float z = 1.0f;
+    //glm::vec3 ray_nds = glm::vec3(x, y, z);
+    //glm::vec4 ray_clip = glm::vec4(ray_nds.x, ray_nds.y, -1.0f, 1.0f);
+    //// eye space to clip we would multiply by projection so
+    //// clip space to eye space is the inverse projection
+    //glm::vec4 ray_eye = inverse(projection) * ray_clip;
+    //// convert point to forwards
+    //ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
+    //// world space to eye space is usually multiply by view so
+    //// eye space to world space is inverse view
+    //glm::vec4 inv_ray_wor = (inverse(view) * ray_eye);
+    //glm::vec3 ray_wor = glm::vec3(inv_ray_wor.x, inv_ray_wor.y, inv_ray_wor.z);
+    //ray_wor = normalize(ray_wor);
+    //return ray_wor;
+
+    //my implementation #####################
+	float top = tan(cam.fov * 0.5) * cam.nearz;
+	float bottom = -top;
+
+	float left = cam.aspect * bottom;
+	float right = cam.aspect * top;
+
+    auto rightV = normalize(glm::cross(cam.EyeDir, cam.Up));
+    auto upV = normalize(glm::cross(rightV, cam.EyeDir));
+
+    auto pointOnNearPlane =
+        + cam.EyeDir * cam.nearz
+        + upV * y * top
+        + rightV * x * right;
+    auto dir = pointOnNearPlane;
+    dir = normalize(dir);
+    return dir;
+	//#####################
+
 }
 
 inline std::vector<char> readFile(const std::string& filename)
@@ -174,6 +201,20 @@ inline std::vector<char> readFile(const std::string& filename)
 
 int main(int argc, char* argv[]) 
 {
+    MessageQueues<MoveEvent>* netThread;
+	if(argc > 1)
+	{
+        auto clientThread = new ClientThread;
+        clientThread->Start();
+        netThread = clientThread;
+	}
+    else
+    {
+        auto serverThread = new ServerThread;
+        serverThread->Start();
+        netThread = serverThread;
+    }
+
     const int windowWidth = 800;
     const int windowHeight = 800;
 
@@ -416,12 +457,15 @@ int main(int argc, char* argv[])
 
     Unit unit;
     unit.Initialize();
+    unit.location = glm::vec3(5, 1, 5);
+    unit.Target = glm::vec3(5, 1, 5);
     unit.name = "unit";
 
 
     Unit unit2;
     unit2.Initialize();
     unit2.location = glm::vec3(10, 1, 10);
+    unit2.Target = glm::vec3(10, 1, 10);
     unit2.name = "unit2";
 
     Scene scene;
@@ -540,9 +584,19 @@ int main(int argc, char* argv[])
                 {
 					int x, y;
 					SDL_GetMouseState(&x, &y);
-                    auto dir = rayCast(x, y, cam.GetPerspectiveMatrix(), cam.GetViewMatrix());
+                    auto dir = rayCast(x, y, cam.GetPerspectiveMatrix(), cam.GetViewMatrix(), cam);
 					auto f = (1.0f - cam.Eye.y) / dir.y;
                     auto target = (cam.Eye + dir * f);
+                    for(auto unit : scene.Objects)
+                    {
+	                    if(unit->selected)
+	                    {
+                            MoveEvent me;
+                            me.UnitName = unit->name;
+                            me.Target = target;
+							netThread->PushOutgoing(me);
+	                    }
+                    }
                     scene.SetTargetOfSelectedUnits(target);
                 }
                 else
@@ -639,6 +693,17 @@ int main(int argc, char* argv[])
             int ymax = std::max(dragStart.y, dragEnd.y);
 			dlist->AddRectFilled(ImVec2(xmin,ymin), ImVec2(xmax,ymax), IM_COL32(50, 168, 141, 180));
 			dlist->AddRect(ImVec2(xmin,ymin), ImVec2(xmax,ymax), IM_COL32(30, 120, 90, 180), 0, 0, 3);
+        }
+        MoveEvent msg;
+        while(netThread->PopReceive(msg))
+        {
+			for(auto unit : scene.Objects)
+			{
+				if(unit->name == msg.UnitName)
+				{
+                    unit->SetTarget(msg.Target);
+				}
+			}
         }
 
         sceneCB.VP = cam.GetVPMatrix();

@@ -7,6 +7,8 @@ set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/External)
 # Dependencies
 # ------------
 
+set(ENET_STATIC 1)
+add_subdirectory(${EXTERNAL_DIR}/enet)
 
 # SDL2 (Minimal setup)
 set(SDL_ATOMIC OFF CACHE BOOL "" FORCE)
@@ -52,9 +54,12 @@ add_library(imgui STATIC ${IMGUI_SOURCES})
 target_link_libraries(imgui PUBLIC SDL2-static)
 target_include_directories(imgui PUBLIC ${IMGUI_INCLUDE_DIR})
 
-
+# enet
 
 set(CMAKE_CXX_STANDARD 17)
+
+
+
 
 file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp
@@ -70,4 +75,4 @@ add_custom_target(Shaders SOURCES ${SHADER_FILES})
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Source/pch.h)
-target_link_libraries(${PROJECT_NAME} PRIVATE SDL2-static DirectX-Headers DirectXTK12 d3d12 dxcompiler dxgi dxguid glm::glm tinyobjloader imgui)
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL2-static DirectX-Headers DirectXTK12 d3d12 dxcompiler dxgi dxguid glm::glm tinyobjloader imgui enet_static)

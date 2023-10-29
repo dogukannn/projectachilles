@@ -1,4 +1,7 @@
 #pragma once
+
+#include "enet.h"
+
 #include "directx/d3dx12.h"
 #include <directx/d3d12sdklayers.h>
 #include <dxgi1_6.h>

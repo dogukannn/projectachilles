@@ -16,3 +16,6 @@
 [submodule "External/imgui"]
 	path = External/imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "External/enet"]
+	path = External/enet
+	url = https://github.com/zpl-c/enet.git
