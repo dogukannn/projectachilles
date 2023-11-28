@@ -33,6 +33,7 @@
 #include "Tilemap.h"
 #include "Unit.h"
 
+#include "dxri.h"
 
 // Global variables for the window and DirectX
 SDL_Window* GWindow = nullptr;
@@ -248,52 +249,32 @@ int main(int argc, char* argv[])
         adapter->Release();
     }
 
+   
     // Create DirectX12 device
-    ID3D12Device* device = nullptr;
-    ThrowIfFailed(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&device)));
+    //ThrowIfFailed(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&device)));
+
+    DXRI dxri;
+    dxri.Initialize();
+    ID3D12Device* device = dxri.Device;
     GDevice = device;
-
-	ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
-
-	D3D12_DESCRIPTOR_HEAP_DESC Imguidesc = {};
-	Imguidesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	Imguidesc.NumDescriptors = 1;
-	Imguidesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    ThrowIfFailed(GDevice->CreateDescriptorHeap(&Imguidesc, IID_PPV_ARGS(&g_pd3dSrvDescHeap)));
-    
-
+	
+	//init imgui
+	ID3D12DescriptorHeap* g_pd3dSrvDescHeap = dxri.CreateDescriptorHeap(1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 	ImGui_ImplDX12_Init(GDevice, 2,
 			DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
 			g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
 			g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
 
-
-    DXGI_ADAPTER_DESC1 desc;
-    adapter->GetDesc1(&desc);
-    
-    std::cout << "DirectX12 device created" << std::endl;
-    std::wcout << "Adapter: " << desc.Description << std::endl;
-    std::cout << "Vendor ID: " << desc.VendorId << std::endl;
-    std::cout << "Device ID: " << desc.DeviceId << std::endl;
-    std::cout << "Dedicated Video Memory: " << desc.DedicatedVideoMemory << std::endl;
-
-    // Create the command queue
-    ID3D12CommandQueue* commandQueue;
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
-
-    ID3D12CommandAllocator* commandAllocator;
-    ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
+    // Create the command queue and allocator
+    ID3D12CommandQueue* commandQueue = dxri.CreateCommandQueue();
+    ID3D12CommandAllocator* commandAllocator = dxri.CreateCommandAllocator();
 
     UINT frameIndex = 0;
     HANDLE fenceEvent;
-    ID3D12Fence* fence;
+    ID3D12Fence* fence = dxri.CreateFence();
     UINT64 fenceValue = 0;
 
-    ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
-	 fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	if (fenceEvent == nullptr)
 	{
 		ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
@@ -301,155 +282,15 @@ int main(int argc, char* argv[])
 
     static const UINT backbufferCount = 2;
     UINT currentBuffer;
-    ID3D12DescriptorHeap* renderTargetViewHeap;
-    ID3D12Resource* renderTargets[backbufferCount];
-    UINT rtvDescriptorSize;
 
-    IDXGISwapChain1* swapchain1;
-    IDXGISwapChain3* swapchain;
+    IDXGISwapChain3* swapchain = dxri.CreateSwapChain(windowWidth, windowHeight, backbufferCount, GWindowHandle, commandQueue);
 
-    D3D12_VIEWPORT viewport;
-    D3D12_RECT surfaceSize;
+    ID3D12DescriptorHeap* renderTargetViewHeap = dxri.CreateDescriptorHeap(backbufferCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+    std::vector<ID3D12Resource*> renderTargets = dxri.CreateRenderTargets(renderTargetViewHeap, swapchain, backbufferCount);
 
-    surfaceSize.left = 0;
-    surfaceSize.top = 0;
-    surfaceSize.right = windowWidth;
-    surfaceSize.bottom = windowHeight;
-
-    viewport.TopLeftX = 0.0f;
-    viewport.TopLeftY = 0.0f;
-    viewport.Width = windowWidth;
-    viewport.Height = windowHeight;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-
-    DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
-    swapchainDesc.BufferCount = backbufferCount;
-    swapchainDesc.Width = windowWidth;
-    swapchainDesc.Height = windowHeight;
-    swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    swapchainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapchainDesc.SampleDesc.Count = 1;
-
-    ThrowIfFailed(factory->CreateSwapChainForHwnd(commandQueue, GWindowHandle, &swapchainDesc, NULL, NULL, &swapchain1));
-
-    ThrowIfFailed(swapchain1->QueryInterface(IID_PPV_ARGS(&swapchain)));
-
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-    rtvHeapDesc.NumDescriptors = backbufferCount;
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&renderTargetViewHeap)));
-
-    rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle(renderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
-
-    for (UINT n = 0; n < backbufferCount; n++)
-    {
-        ThrowIfFailed(swapchain->GetBuffer(n, IID_PPV_ARGS(&renderTargets[n])));
-        device->CreateRenderTargetView(renderTargets[n], nullptr, rtvHandle);
-        rtvHandle.ptr += (1 * rtvDescriptorSize);
-    }
-
-    ID3D12DescriptorHeap* sideRenderTargetViewHeap;
-    ID3D12Resource* backDepthRenderTargets[backbufferCount];
-    ID3D12Resource* frontDepthRenderTargets[backbufferCount];
-
-    CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
-
-    D3D12_RESOURCE_DESC sideRTDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				DXGI_FORMAT_R32_FLOAT,
-				windowWidth,
-				windowHeight,
-				1,
-				1,
-				1);
-    sideRTDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-    D3D12_CLEAR_VALUE sideRTClearValue = {};
-    sideRTClearValue.Format = DXGI_FORMAT_R32_FLOAT;
-    sideRTClearValue.Color[0] = 0.0f;
-
-    for(int i = 0; i < backbufferCount; i++)
-    {
-		ThrowIfFailed(device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&sideRTDesc,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			&sideRTClearValue,
-			IID_PPV_ARGS(&backDepthRenderTargets[i])
-		));
-		backDepthRenderTargets[i]->SetName(L"back depth write targets");
-
-		ThrowIfFailed(device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&sideRTDesc,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			&sideRTClearValue,
-			IID_PPV_ARGS(&frontDepthRenderTargets[i])
-		));
-		frontDepthRenderTargets[i]->SetName(L"front depth write targets");
-    }
-
-    D3D12_DESCRIPTOR_HEAP_DESC sideRtvHeapDesc = {};
-    sideRtvHeapDesc.NumDescriptors = backbufferCount * 2;
-    sideRtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    sideRtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    ThrowIfFailed(device->CreateDescriptorHeap(&sideRtvHeapDesc, IID_PPV_ARGS(&sideRenderTargetViewHeap)));
-
-    rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-    D3D12_CPU_DESCRIPTOR_HANDLE sideRtvHandle(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
-
-    for (UINT n = 0; n < backbufferCount; n++)
-    {
-        device->CreateRenderTargetView(backDepthRenderTargets[n], nullptr, sideRtvHandle);
-        sideRtvHandle.ptr += (1 * rtvDescriptorSize);
-    }
-    for (UINT n = 0; n < backbufferCount; n++)
-    {
-        device->CreateRenderTargetView(frontDepthRenderTargets[n], nullptr, sideRtvHandle);
-        sideRtvHandle.ptr += (1 * rtvDescriptorSize);
-    }
-    
 	//create depth stencil
-    ID3D12Resource* depthStencilBuffer;
-    ID3D12DescriptorHeap* dsDescriptorHeap;
-
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-    dsvHeapDesc.NumDescriptors = 1;
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    ThrowIfFailed(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsDescriptorHeap)));
-
-    D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
-    depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
-    depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
-
-	D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-	depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-	depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-	depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-	ThrowIfFailed(device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, windowWidth, windowHeight, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,
-		&depthOptimizedClearValue,
-		IID_PPV_ARGS(&depthStencilBuffer)
-    ));
-	dsDescriptorHeap->SetName(L"Depth/Stencil Resource Heap");
-
-	device->CreateDepthStencilView(depthStencilBuffer, &depthStencilDesc, dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-    //Mesh mesh;
-    //mesh.loadFromObj(device, "../Assets/graveyard.obj");
+    ID3D12DescriptorHeap* dsDescHeap = dxri.CreateDescriptorHeap(1, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+    ID3D12Resource* depthStencilBuffer = dxri.CreateDepthBuffer(windowWidth, windowHeight, dsDescHeap);
 
     Tilemap tilemap;
     tilemap.Initialize(9, 5.0f);
@@ -517,10 +358,7 @@ int main(int argc, char* argv[])
     texture.LoadFromFile(device, commandQueue, L"../Assets/lost_empire-RGBA.png");
     pipeline.BindTexture(device, "g_texture", &texture);
 
-	ID3D12GraphicsCommandList* commandList;
-	ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-											commandAllocator, pipeline.PipelineState,
-											IID_PPV_ARGS(&commandList)));
+	ID3D12GraphicsCommandList* commandList = dxri.CreateGraphicsCommandList(commandAllocator, pipeline.PipelineState);
     commandList->Close();
 
 	std::chrono::time_point<std::chrono::system_clock> startTime;
@@ -538,6 +376,25 @@ int main(int argc, char* argv[])
     ImVec2 dragStart(0,0);
     ImVec2 dragEnd(0,0);
     bool dragFinished = false;
+
+    D3D12_VIEWPORT viewport;
+    D3D12_RECT surfaceSize;
+
+    surfaceSize.left = 0;
+    surfaceSize.top = 0;
+    surfaceSize.right = windowWidth;
+    surfaceSize.bottom = windowHeight;
+
+    viewport.TopLeftX = 0.0f;
+    viewport.TopLeftY = 0.0f;
+    viewport.Width = windowWidth;
+    viewport.Height = windowHeight;
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+    
+    UINT rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
 
     while (!quit)
     {
@@ -734,11 +591,11 @@ int main(int argc, char* argv[])
 			rtvHandle2(renderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
 		rtvHandle2.ptr = rtvHandle2.ptr + (frameIndex * rtvDescriptorSize);
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+		CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsDescHeap->GetCPUDescriptorHandleForHeapStart());
 
         commandList->OMSetRenderTargets(1, &rtvHandle2, FALSE, &dsvHandle);
 
-        commandList->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+        commandList->ClearDepthStencilView(dsDescHeap->GetCPUDescriptorHandleForHeapStart(),
                                            D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 		const float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -762,48 +619,6 @@ int main(int argc, char* argv[])
 		commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 
-		//D3D12_CPU_DESCRIPTOR_HANDLE
-		//	rtvHandle3(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
-		//rtvHandle3.ptr = rtvHandle3.ptr + (frameIndex * rtvDescriptorSize);
-
-		//const float clearColorx[] = {0.0f, 0.0f, 0.0f, 0.0f};
-		//commandList->ClearRenderTargetView(rtvHandle3, clearColorx, 0, nullptr);
-  //      
-  //      CopyTexturePlain(commandList, D3D12_RESOURCE_STATE_RENDER_TARGET, backDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_DEPTH_WRITE, depthStencilBuffer);
-		//
-  //      commandList->OMSetRenderTargets(1, &rtvHandle3, FALSE, &dsvHandle);
-
-  //      depthBackPipeline.SetPipelineState(commandAllocator, commandList);
-  //  	depthBackPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
-		//commandList->IASetVertexBuffers(0, 1, &cubeMesh.vertexBufferView);
-  //      commandList->DrawInstanced(cubeMesh._vertices.size(), 1, 0, 0);
-
-		//D3D12_CPU_DESCRIPTOR_HANDLE
-		//	rtvHandle4(sideRenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
-		//rtvHandle4.ptr = rtvHandle4.ptr + ((frameIndex + backbufferCount) * rtvDescriptorSize);
-
-		//commandList->ClearRenderTargetView(rtvHandle4, clearColorx, 0, nullptr);
-  //      
-  //      commandList->OMSetRenderTargets(1, &rtvHandle4, FALSE, &dsvHandle);
-  //      depthFrontPipeline.SetPipelineState(commandAllocator, commandList);
-  //  	depthFrontPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
-		//commandList->IASetVertexBuffers(0, 1, &cubeMesh.vertexBufferView);
-  //      commandList->DrawInstanced(cubeMesh._vertices.size(), 1, 0, 0);
-
-
-		//commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(backDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE));
-		//commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(frontDepthRenderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE));
-  //      
-  //      commandList->OMSetRenderTargets(1, &rtvHandle2, FALSE, &dsvHandle);
-  //      commandList->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-  //                                         D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-  //      volumetricPipeline.SetPipelineState(commandAllocator, commandList);
-  //  	volumetricPipeline.BindConstantBuffer("cb", &cubeBuffer, commandList);
-  //  	volumetricPipeline.BindTexture(device, "frontCulled", backDepthRenderTargets[frameIndex]);
-  //  	volumetricPipeline.BindTexture(device, "backCulled", frontDepthRenderTargets[frameIndex]);
-		//commandList->IASetVertexBuffers(0, 1, &triangle.vertexBufferView);
-  //      commandList->DrawInstanced(triangle._vertices.size(), 1, 0, 0);
         commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 		ThrowIfFailed(commandList->Close());

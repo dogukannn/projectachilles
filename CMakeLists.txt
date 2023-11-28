@@ -31,8 +31,8 @@ set(SDL_STATIC ON  CACHE BOOL "" FORCE)
 set(SDL_STATIC_PIC ON CACHE BOOL "" FORCE)
 add_subdirectory(${EXTERNAL_DIR}/SDL)
 
-add_subdirectory(${EXTERNAL_DIR}/DirectX-Headers)
-add_subdirectory(${EXTERNAL_DIR}/DirectXTK12)
+#add_subdirectory(${EXTERNAL_DIR}/DirectX-Headers)
+#add_subdirectory(${EXTERNAL_DIR}/DirectXTK12)
 
 add_subdirectory(${EXTERNAL_DIR}/tinyobjloader)
 
@@ -54,7 +54,8 @@ add_library(imgui STATIC ${IMGUI_SOURCES})
 target_link_libraries(imgui PUBLIC SDL2-static)
 target_include_directories(imgui PUBLIC ${IMGUI_INCLUDE_DIR})
 
-# enet
+#dxri 
+add_subdirectory(${EXTERNAL_DIR}/dxri)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -75,4 +76,4 @@ add_custom_target(Shaders SOURCES ${SHADER_FILES})
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Source/pch.h)
-target_link_libraries(${PROJECT_NAME} PRIVATE SDL2-static DirectX-Headers DirectXTK12 d3d12 dxcompiler dxgi dxguid glm::glm tinyobjloader imgui enet_static)
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL2-static DirectX-Headers DirectXTK12 d3d12 dxcompiler dxgi dxguid glm::glm tinyobjloader imgui enet_static dxri)
