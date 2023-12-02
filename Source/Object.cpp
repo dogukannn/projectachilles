@@ -25,8 +25,10 @@ glm::mat4 Object::GetModelMatrix()
 }
 
 
-void Object::Draw(ID3D12GraphicsCommandList* cmd, Pipeline& pipeline)
+void Object::Draw(ID3D12GraphicsCommandList* cmd, Material* material, ConstantBuffer* sceneBuffer)
 {
+    material->pipeline->SetPipelineState(cmd);
+	material->pipeline->BindConstantBuffer("scene", sceneBuffer, cmd);
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, location);
 	model = glm::scale(model, scale);
@@ -41,8 +43,8 @@ void Object::Draw(ID3D12GraphicsCommandList* cmd, Pipeline& pipeline)
 
 	memcpy(tintcbMapped, &tintCb, sizeof(ObjectTintCB));
 
-	pipeline.BindConstantBuffer("object", &cb, cmd);
-	pipeline.BindConstantBuffer("objectTint", &tintcb, cmd);
+	material->pipeline->BindConstantBuffer("object", &cb, cmd);
+	material->pipeline->BindConstantBuffer("objectTint", &tintcb, cmd);
 	cmd->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);
 	//commandList->IASetIndexBuffer(&indexBufferView);
 	cmd->DrawInstanced(mesh._vertices.size(), 1, 0, 0);

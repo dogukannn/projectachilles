@@ -7,6 +7,13 @@
 #include "Mesh.h"
 #include "Pipeline.h"
 
+
+struct Material
+{
+	Pipeline* pipeline;
+	void Initialize(Pipeline* _pipeline) { pipeline = _pipeline; }
+};
+
 struct ObjectCB 
 {
 	glm::mat4 Model;
@@ -44,5 +51,5 @@ struct Object
 
 	virtual void SetTarget(glm::vec3 target) {}
 
-	void Draw(ID3D12GraphicsCommandList* cmd, Pipeline& pipeline);
+	void Draw(ID3D12GraphicsCommandList* cmd, Material* material, ConstantBuffer* sceneBuffer);
 };

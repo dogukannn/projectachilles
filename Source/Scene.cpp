@@ -121,17 +121,17 @@ inline glm::vec3 Frustum::intersection(const glm::vec3* crosses) const
 	return res * (-1.0f / D);
 }
 
-void Scene::Draw(ID3D12GraphicsCommandList* cmd, Pipeline& pipeline)
+void Scene::Draw(ID3D12GraphicsCommandList* cmd, Pipeline& pipeline, ConstantBuffer* sceneBuffer)
 {
-	for(auto& object : Objects)
+	for(auto& [object,material] : Objects)
 	{
-		object->Draw(cmd, pipeline);
+		object->Draw(cmd, material, sceneBuffer);
 	}
 }
 
 void Scene::Update(float deltaTime)
 {
-	for(auto& object : Objects)
+	for(auto& [object,_] : Objects)
 	{
 		object->Update(deltaTime);
 	}
@@ -139,19 +139,19 @@ void Scene::Update(float deltaTime)
 
 void Scene::SetTargetOfSelectedUnits(glm::vec3 target)
 {
-	for(auto object : Objects)
+	for(auto [object,_] : Objects)
 		if (object->selected)
 			object->SetTarget(target);
 }
 
 void Scene::SelectUnits(glm::vec2 start, glm::vec2 end, Camera& cam)
 {
-	std::cout <<"START	" << start.x << ", " << start.y << std::endl;
-	std::cout <<"END	" << end.x << ", " << end.y << std::endl;
+	std::cout << "START	" << start.x << ", " << start.y << std::endl;
+	std::cout << "END	" << end.x << ", " << end.y << std::endl;
 
 	if (glm::distance(start, end) < 0.01)
 	{
-		for (auto object : Objects)
+		for (auto [object, _] : Objects)
 			object->selected = false;
 		return;
 	}
@@ -168,7 +168,7 @@ void Scene::SelectUnits(glm::vec2 start, glm::vec2 end, Camera& cam)
 	float xmax = std::max(start.x, end.x);
 	float ymin = std::min(start.y, end.y);
 	float ymax = std::max(start.y, end.y);
-	
+
 	float sLeft = left + (right - left) * xmin;
 	float sRight = left + (right - left) * xmax;
 	float sTop = top + (bottom - top) * ymin;
@@ -180,7 +180,7 @@ void Scene::SelectUnits(glm::vec2 start, glm::vec2 end, Camera& cam)
 
 	Frustum fm(pers * view);
 
-	for (auto object : Objects)
+	for (auto [object,_] :Objects)
 	{
 		object->selected = false;
 		if (!object->IsSelectable())

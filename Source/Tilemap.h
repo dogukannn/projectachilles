@@ -2,6 +2,7 @@
 
 #include "Object.h"
 #include "pch.h"
+#include <glm/vec3.hpp>
 
 struct Tilemap : public Object
 {
@@ -10,5 +11,5 @@ struct Tilemap : public Object
 
 	virtual void Update(float deltaTime) override;
 
-	bool Initialize(DXRI* dxri, int size, float gridLen);
+	bool Initialize(::DXRI* dxri, int size, float gridLen, glm::vec3 offset = glm::vec3(0.,0.,0.));
 };

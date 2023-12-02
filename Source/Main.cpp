@@ -294,6 +294,10 @@ int main(int argc, char* argv[])
     tilemap.Initialize(&dxri, 9, 5.0f);
     tilemap.name = "tilemap";
 
+    Tilemap water;
+    water.Initialize(&dxri, 90, 0.5, {-50, 0, 0});
+    water.name = "water";
+
     Unit unit;
     unit.Initialize(&dxri);
     unit.location = glm::vec3(5, 1, 5);
@@ -306,11 +310,6 @@ int main(int argc, char* argv[])
     unit2.location = glm::vec3(10, 1, 10);
     unit2.Target = glm::vec3(10, 1, 10);
     unit2.name = "unit2";
-
-    Scene scene;
-    scene.Objects.push_back(&tilemap);
-    scene.Objects.push_back(&unit);
-    scene.Objects.push_back(&unit2);
 
 
     Mesh cubeMesh;
@@ -349,18 +348,41 @@ int main(int argc, char* argv[])
 
 	VertexShader noopVertexShader(L"../Assets/noop.vert.hlsl");
 
+    VertexShader waterVertexShader(L"../Assets/water.vert.hlsl");
+    PixelShader waterPixelShader(L"../Assets/water.px.hlsl");
+
 	Pipeline pipeline;
 	pipeline.Initialize(&dxri, &triangleVertexShader, &trianglePixelShader);
+
+	Pipeline waterPipeline;
+	waterPipeline.Initialize(&dxri, &waterVertexShader, &waterPixelShader);
 
     Texture texture;
     texture.LoadFromFile(device, commandQueue, L"../Assets/lost_empire-RGBA.png");
     pipeline.BindTexture(device, "g_texture", &texture);
+
+    Material defaultMaterial;
+    defaultMaterial.Initialize(&pipeline);
+
+    Material waterMaterial;
+    waterMaterial.Initialize(&waterPipeline);
+
+
+    Scene scene;
+    scene.Objects.insert({ &tilemap, &defaultMaterial });
+    scene.Objects.insert({ &unit, &defaultMaterial });
+    scene.Objects.insert({ &unit2, &defaultMaterial });
+    scene.Objects.insert({ &water, &waterMaterial });
+  
 
 	ID3D12GraphicsCommandList* commandList = dxri.CreateGraphicsCommandList(commandAllocator, pipeline.PipelineState);
     commandList->Close();
 
 	std::chrono::time_point<std::chrono::system_clock> startTime;
 	startTime = std::chrono::system_clock::now();
+
+	std::chrono::time_point<std::chrono::system_clock> beginTime;
+	beginTime = startTime;
 
 	frameIndex = swapchain->GetCurrentBackBufferIndex();
     SDL_Event event;
@@ -442,7 +464,7 @@ int main(int argc, char* argv[])
                     auto dir = rayCast(x, y, cam.GetPerspectiveMatrix(), cam.GetViewMatrix(), cam);
 					auto f = (1.0f - cam.Eye.y) / dir.y;
                     auto target = (cam.Eye + dir * f);
-                    for(auto unit : scene.Objects)
+                    for(auto [unit,_] : scene.Objects)
                     {
 	                    if(unit->selected)
 	                    {
@@ -552,7 +574,7 @@ int main(int argc, char* argv[])
         MoveEvent msg;
         while(netThread->PopReceive(msg))
         {
-			for(auto unit : scene.Objects)
+			for(auto [unit,_] : scene.Objects)
 			{
 				if(unit->name == msg.UnitName)
 				{
@@ -565,7 +587,7 @@ int main(int argc, char* argv[])
         sceneCB.eye = cam.Eye;
 
 		auto now = std::chrono::system_clock::now();
-		std::chrono::duration<float, std::ratio<1,1>> diff = now - startTime;
+		std::chrono::duration<float, std::ratio<1,1>> diff = now - beginTime;
 		sceneCB.time = diff.count();
 
 #ifdef DEBUG_CAMERA_LOCATION
@@ -581,7 +603,7 @@ int main(int argc, char* argv[])
 
 		ThrowIfFailed(commandList->Reset(commandAllocator, nullptr));
 
-        pipeline.SetPipelineState(commandAllocator, commandList);
+        //pipeline.SetPipelineState(commandList);
 
         commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
@@ -602,7 +624,6 @@ int main(int argc, char* argv[])
 		commandList->ClearRenderTargetView(rtvHandle2, clearColor, 0, nullptr);
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		pipeline.BindConstantBuffer("scene", &sceneBuffer, commandList);
 
         if(dragFinished)
         {
@@ -611,7 +632,7 @@ int main(int argc, char* argv[])
         }
 
         scene.Update(deltaTime);
-        scene.Draw(commandList, pipeline);
+        scene.Draw(commandList, pipeline, &sceneBuffer);
 
         ImGui::Render();
 		commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);

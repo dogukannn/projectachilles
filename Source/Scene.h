@@ -4,9 +4,9 @@
 
 struct Scene
 {
-	std::vector<Object*> Objects;
+	std::map<Object*, Material*> Objects;
 
-	void Draw(ID3D12GraphicsCommandList* cmd, Pipeline& pipeline);
+	void Draw(ID3D12GraphicsCommandList* cmd, Pipeline& pipeline, ConstantBuffer* sceneBuffer);
 	void Update(float deltaTime);
 
 	void SetTargetOfSelectedUnits(glm::vec3 target);

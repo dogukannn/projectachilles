@@ -1,11 +1,13 @@
 #include "Tilemap.h"
 
+#include "Camera.h"
+
 void Tilemap::Update(float deltaTime)
 {
 
 }
 
-bool Tilemap::Initialize(DXRI* dxri, int size, float gridLen)
+bool Tilemap::Initialize(DXRI* dxri, int size, float gridLen, glm::vec3 offset)
 {
 	Object::Initialize(dxri);
 
@@ -23,6 +25,11 @@ bool Tilemap::Initialize(DXRI* dxri, int size, float gridLen)
 			Vertex v2 = { glm::vec3((x+1)*gridLen, 0, y*gridLen), glm::vec3(0,0,1.0f), glm::vec3(r,g,b), glm::vec2(0,0) };
 			Vertex v3 = { glm::vec3(x*gridLen, 0, (y+1)*gridLen), glm::vec3(0,0,1.0f), glm::vec3(r,g,b), glm::vec2(0,0) };
 			Vertex v4 = { glm::vec3((x+1)*gridLen, 0, (y+1)*gridLen), glm::vec3(0,0,1.0f), glm::vec3(r,g,b), glm::vec2(0,0) };
+
+			v1.position += offset;
+			v2.position += offset;
+			v3.position += offset;
+			v4.position += offset;
 
 			vertices.push_back(v1);
 			vertices.push_back(v3);

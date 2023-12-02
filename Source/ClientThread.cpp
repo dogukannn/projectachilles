@@ -1,4 +1,5 @@
 #include "ClientThread.h"
+#define START_TIMEOUT 10
 
 bool ClientThread::Start()
 {
@@ -34,7 +35,7 @@ bool ClientThread::Start()
 		return false;
 	}
 	/* Wait up to 5 seconds for the connection attempt to succeed. */
-	if (enet_host_service(client, &event, 5000) > 0 &&
+	if (enet_host_service(client, &event, START_TIMEOUT) > 0 &&
 		event.type == ENET_EVENT_TYPE_CONNECT) {
 		puts("Connection to some.server.net:1234 succeeded.");
 	} else {
