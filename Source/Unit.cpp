@@ -11,12 +11,12 @@ void Unit::Update(float deltaTime)
 
 }
 
-void Unit::Initialize()
+void Unit::Initialize(DXRI* dxri)
 {
 	Target = glm::vec3(5, 0, 5);
 
-	Object::Initialize();
-	mesh.loadFromObj(GDevice, "../Assets/cube.obj");
+	Object::Initialize(dxri);
+	mesh.loadFromObj(dxri, "../Assets/cube.obj");
 
 	location = glm::vec3(0, 1, 0);
 }

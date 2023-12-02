@@ -5,9 +5,9 @@ void Tilemap::Update(float deltaTime)
 
 }
 
-bool Tilemap::Initialize(int size, float gridLen)
+bool Tilemap::Initialize(DXRI* dxri, int size, float gridLen)
 {
-	Object::Initialize();
+	Object::Initialize(dxri);
 
 	std::vector<Vertex> vertices;
 
@@ -35,6 +35,6 @@ bool Tilemap::Initialize(int size, float gridLen)
 		}
 	}
 
-	mesh.loadFromVertices(GDevice, vertices);
+	mesh.loadFromVertices(dxri, vertices);
 	return true;
 }

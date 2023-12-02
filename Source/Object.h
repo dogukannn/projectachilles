@@ -34,7 +34,7 @@ struct Object
 	ConstantBuffer tintcb;
 	UINT8* tintcbMapped = nullptr;
 
-	virtual void Initialize();
+	virtual void Initialize(DXRI* dxri);
 
 	glm::mat4 GetModelMatrix();
 

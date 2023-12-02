@@ -10,5 +10,5 @@ struct Tilemap : public Object
 
 	virtual void Update(float deltaTime) override;
 
-	bool Initialize(int size, float gridLen);
+	bool Initialize(DXRI* dxri, int size, float gridLen);
 };

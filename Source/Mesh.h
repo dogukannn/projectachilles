@@ -5,6 +5,8 @@
 #include "pch.h"
 
 
+class DXRI;
+
 struct Vertex
 {
 	glm::vec3 position;
@@ -41,6 +43,6 @@ struct Mesh
     ID3D12Resource* vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
 
-	bool loadFromObj(ID3D12Device* device, const char* filename);
-	bool loadFromVertices(ID3D12Device* device, std::vector<Vertex>& vertices);
+	bool loadFromObj(DXRI* dxri, const char* filename);
+	bool loadFromVertices(DXRI* dxri, std::vector<Vertex>& vertices);
 };

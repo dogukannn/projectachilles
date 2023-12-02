@@ -2,14 +2,14 @@
 
 #include <glm/ext/matrix_transform.hpp>
 
-void Object::Initialize()
+void Object::Initialize(DXRI* dxri)
 {
-    cb.Initialize(GDevice, sizeof(ObjectCB));
+    cb.Initialize(dxri, sizeof(ObjectCB));
     cbMapped = cb.Map();
 	objCb.Model = glm::mat4(1.0f);
 	memcpy(cbMapped, &objCb, sizeof(ObjectCB));
 
-    tintcb.Initialize(GDevice, sizeof(ObjectTintCB));
+    tintcb.Initialize(dxri, sizeof(ObjectTintCB));
     tintcbMapped = tintcb.Map();
 	tintCb.tint = glm::vec3(0.0f);
 	memcpy(tintcbMapped, &tintCb, sizeof(ObjectTintCB));

@@ -7,7 +7,7 @@ struct Unit : public Object
 
 	virtual void Update(float deltaTime) override;
 	virtual bool IsSelectable() override { return true; };
-	void Initialize() override;
+	void Initialize(DXRI* dxri) override;
 
 	virtual void SetTarget(glm::vec3 target) override { Target = target; }
 };

@@ -39,7 +39,6 @@
 SDL_Window* GWindow = nullptr;
 SDL_Renderer* GWindowRenderer = nullptr;
 HWND GWindowHandle = nullptr;
-ID3D12Device* GDevice = nullptr;
 
 struct SceneCB
 {
@@ -256,11 +255,10 @@ int main(int argc, char* argv[])
     DXRI dxri;
     dxri.Initialize();
     ID3D12Device* device = dxri.Device;
-    GDevice = device;
 	
 	//init imgui
 	ID3D12DescriptorHeap* g_pd3dSrvDescHeap = dxri.CreateDescriptorHeap(1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
-	ImGui_ImplDX12_Init(GDevice, 2,
+	ImGui_ImplDX12_Init(dxri.Device, 2,
 			DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
 			g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
 			g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
@@ -293,18 +291,18 @@ int main(int argc, char* argv[])
     ID3D12Resource* depthStencilBuffer = dxri.CreateDepthBuffer(windowWidth, windowHeight, dsDescHeap);
 
     Tilemap tilemap;
-    tilemap.Initialize(9, 5.0f);
+    tilemap.Initialize(&dxri, 9, 5.0f);
     tilemap.name = "tilemap";
 
     Unit unit;
-    unit.Initialize();
+    unit.Initialize(&dxri);
     unit.location = glm::vec3(5, 1, 5);
     unit.Target = glm::vec3(5, 1, 5);
     unit.name = "unit";
 
 
     Unit unit2;
-    unit2.Initialize();
+    unit2.Initialize(&dxri);
     unit2.location = glm::vec3(10, 1, 10);
     unit2.Target = glm::vec3(10, 1, 10);
     unit2.name = "unit2";
@@ -316,7 +314,7 @@ int main(int argc, char* argv[])
 
 
     Mesh cubeMesh;
-    cubeMesh.loadFromObj(device, "../Assets/cube.obj");
+    cubeMesh.loadFromObj(&dxri, "../Assets/cube.obj");
 
     //vertices for fullscreen triangle
     Vertex a = { {-3.0f, -1.0f, 0.0f}, {3.f, 3.f, 3.f}, {3.f, 3.f, 3.f}, {3.f, 3.f} };
@@ -324,7 +322,7 @@ int main(int argc, char* argv[])
     Vertex c = { {1.0f, 3.0f, 0.0f}, {3.f, 3.f, 3.f}, {3.f, 3.f, 3.f}, {3.f, 3.f} };
     std::vector<Vertex> tri = { a, b, c };
     Mesh triangle;
-    triangle.loadFromVertices(device, tri);
+    triangle.loadFromVertices(&dxri, tri);
 
     //init scene
     glm::vec3 StartEye = glm::vec3(7.5f, 30.0f, 0.0f);
@@ -337,7 +335,7 @@ int main(int argc, char* argv[])
 	cam.Up = StartUp;
 
     ConstantBuffer sceneBuffer;
-    sceneBuffer.Initialize(device, sizeof(SceneCB));
+    sceneBuffer.Initialize(&dxri, sizeof(SceneCB));
     UINT8* sceneBufferMapped = sceneBuffer.Map();
 
     SceneCB sceneCB;
@@ -352,7 +350,7 @@ int main(int argc, char* argv[])
 	VertexShader noopVertexShader(L"../Assets/noop.vert.hlsl");
 
 	Pipeline pipeline;
-	pipeline.Initialize(device, &triangleVertexShader, &trianglePixelShader);
+	pipeline.Initialize(&dxri, &triangleVertexShader, &trianglePixelShader);
 
     Texture texture;
     texture.LoadFromFile(device, commandQueue, L"../Assets/lost_empire-RGBA.png");

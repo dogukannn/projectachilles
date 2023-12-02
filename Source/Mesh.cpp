@@ -5,8 +5,11 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-bool Mesh::loadFromObj(ID3D12Device* device, const char* filename)
+#include "dxri.h"
+
+bool Mesh::loadFromObj(DXRI* dxri, const char* filename)
 {
+    auto device = dxri->Device;
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
@@ -124,9 +127,9 @@ bool Mesh::loadFromObj(ID3D12Device* device, const char* filename)
 	return true;
 }
 
-bool Mesh::loadFromVertices(ID3D12Device* device, std::vector<Vertex>& vertices)
+bool Mesh::loadFromVertices(DXRI* dxri, std::vector<Vertex>& vertices)
 {
-    
+    auto device = dxri->Device;
     glm::vec3 maxp(FLT_MIN, FLT_MIN, FLT_MIN);
     glm::vec3 minp(FLT_MAX, FLT_MAX, FLT_MAX);
 	for(auto v : vertices)
