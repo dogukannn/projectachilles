@@ -291,11 +291,11 @@ int main(int argc, char* argv[])
     ID3D12Resource* depthStencilBuffer = dxri.CreateDepthBuffer(windowWidth, windowHeight, dsDescHeap);
 
     Tilemap tilemap;
-    tilemap.Initialize(&dxri, 9, 5.0f);
+    tilemap.Initialize(&dxri, 10, 5.0f, {-25,0,-25}, true);
     tilemap.name = "tilemap";
 
     Tilemap water;
-    water.Initialize(&dxri, 90, 0.5, {-50, 0, 0});
+    water.Initialize(&dxri, 200, 0.5, {-50, -3, -50});
     water.name = "water";
 
     Unit unit;

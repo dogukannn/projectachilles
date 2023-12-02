@@ -11,5 +11,5 @@ struct Tilemap : public Object
 
 	virtual void Update(float deltaTime) override;
 
-	bool Initialize(::DXRI* dxri, int size, float gridLen, glm::vec3 offset = glm::vec3(0.,0.,0.));
+	bool Initialize(::DXRI* dxri, int size, float gridLen, glm::vec3 offset = glm::vec3(0.,0.,0.), bool slopedEdge = false);
 };
