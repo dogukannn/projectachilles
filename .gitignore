@@ -1,2 +1,7 @@
 *Build
 *.dxil
+.vs
+.cache
+Source/.cache
+buildninja
+compile_commands.json

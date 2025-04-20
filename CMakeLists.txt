@@ -4,6 +4,7 @@ project(ProjectAchilles)
 
 set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/External)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Dependencies
 # ------------
 
@@ -35,7 +36,6 @@ add_subdirectory(${EXTERNAL_DIR}/SDL)
 #add_subdirectory(${EXTERNAL_DIR}/DirectXTK12)
 
 add_subdirectory(${EXTERNAL_DIR}/tinyobjloader)
-
 add_subdirectory(${EXTERNAL_DIR}/glm)
 
 # imgui

@@ -59,7 +59,8 @@ bool InitializeWindow(int width, int height)
         return false;
     }
 
-	//SDL_SetRelativeMouseMode(SDL_TRUE);
+
+    //SDL_ShowCursor(SDL_TRUE);
 
     // Create window
     GWindow = SDL_CreateWindow("DirectX12 Window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
@@ -388,10 +389,8 @@ int main(int argc, char* argv[])
     SDL_Event event;
     bool quit = false;
 
-    float speed = 0.03f;
     static const glm::vec3 forward(0.f,0.f,1.f);
     static const glm::vec3 right(-1.f,0.f,0.f);
-    bool captureDir = false;
     bool drag = false;
     ImVec2 dragStart(0,0);
     ImVec2 dragEnd(0,0);
@@ -451,7 +450,6 @@ int main(int argc, char* argv[])
 						cam.Eye = StartEye;
 						cam.EyeDir =  StartEyeDir;
 						cam.Up = StartUp;
-                        captureDir = false;
 						break;
 	            }
             }
@@ -479,9 +477,6 @@ int main(int argc, char* argv[])
                 else
                 {
 					std::cout << "doiwnnn" << std::endl;
-					if (!captureDir)
-						SDL_GetRelativeMouseState(nullptr, nullptr);
-					captureDir = true;
 					int x, y;
 					SDL_GetMouseState(&x, &y);
 					dragStart = ImVec2(x, y);
@@ -512,55 +507,19 @@ int main(int argc, char* argv[])
 			dragEnd = ImVec2(x, y);
         }
 
-        const Uint8* a = SDL_GetKeyboardState(NULL);
 
-        if(a[SDL_SCANCODE_D])
-			cam.Eye += normalize(glm::cross(cam.EyeDir, cam.Up)) * speed * deltaTime;
-        if(a[SDL_SCANCODE_W])
-			cam.Eye += normalize(cam.EyeDir) * speed * deltaTime;
-        if(a[SDL_SCANCODE_S])
-			cam.Eye -= normalize(cam.EyeDir) * speed * deltaTime;
-        if(a[SDL_SCANCODE_A])
-			cam.Eye -= normalize(glm::cross(cam.EyeDir, cam.Up)) * speed * deltaTime;
+		int mouseX, mouseY;
+		SDL_GetMouseState(&mouseX, &mouseY);
 
-        if(captureDir && (SDL_GetWindowFlags(GWindow) & SDL_WINDOW_INPUT_FOCUS))
-        {
-			//int x = 0, y = 0;
-   //     	static float pitch = glm::degrees(asin(cam.EyeDir.y));
-   //         static float yaw = asin(cam.EyeDir.x / cos(pitch));
-			//SDL_GetRelativeMouseState(&x, &y);
-   //         yaw -= x * 0.2f;
-   //         pitch -= y * 0.2f;
-   //         glm::vec3 direction;
-			//direction.z = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-			//direction.y = sin(glm::radians(pitch));
-			//direction.x = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-   //         cam.EyeDir = direction;
+        const Uint8* sdl_keyboard_state = SDL_GetKeyboardState(NULL);
 
-		   int xw, yw;
-            SDL_GetMouseState(&xw, &yw);
-            //std::cout << xw <<  ", " << yw << std::endl;
-            if(xw < 10)
-            {
-                auto right = normalize(glm::cross(cam.EyeDir, cam.Up)) * speed * deltaTime;
-                cam.Eye -= glm::vec3(right.x, 0, right.z);
-            }
-            else if(xw > 790)
-            {
-                auto right = normalize(glm::cross(cam.EyeDir, cam.Up)) * speed * deltaTime;
-                cam.Eye += glm::vec3(right.x, 0, right.z);
-            }
-            if(yw < 10)
-            {
-                auto forward = normalize(cam.EyeDir) * speed * deltaTime;
-                cam.Eye += glm::vec3(forward.x, 0, forward.z);
-            }
-            else if(yw > 790)
-            {
-                auto forward = normalize(cam.EyeDir) * speed * deltaTime;
-                cam.Eye -= glm::vec3(forward.x, 0, forward.z);
-            }
-        }
+        bool windowFocused = SDL_GetWindowFlags(GWindow) & SDL_WINDOW_INPUT_FOCUS;
+
+        cam.HandleInput(sdl_keyboard_state, mouseX, mouseY, windowFocused, deltaTime);
+
+
+
+        float speed = 0.33f;
         if(drag)
         {
 			auto dlist = ImGui::GetForegroundDrawList();
@@ -571,6 +530,7 @@ int main(int argc, char* argv[])
 			dlist->AddRectFilled(ImVec2(xmin,ymin), ImVec2(xmax,ymax), IM_COL32(50, 168, 141, 180));
 			dlist->AddRect(ImVec2(xmin,ymin), ImVec2(xmax,ymax), IM_COL32(30, 120, 90, 180), 0, 0, 3);
         }
+
         MoveEvent msg;
         while(netThread->PopReceive(msg))
         {
